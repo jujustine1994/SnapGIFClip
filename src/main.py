@@ -39,8 +39,8 @@ class SnapGIFClipApp:
         self.root = root
         self.root.title("SnapGIFClip")
         self.root.resizable(True, True)
-        self.root.minsize(520, 400)
-        self.root.geometry("560x500")
+        self.root.minsize(520, 500)
+        self.root.geometry("580x680")
 
         self.msg_queue: queue.Queue = queue.Queue()
         self._recorder = None
