@@ -59,8 +59,8 @@ def estimate_mp4_size(width: int, height: int, fps: int,
 class EditorTab:
     """影像編輯 Tab 的完整 UI 與邏輯。"""
 
-    PREVIEW_W = 460
-    PREVIEW_H = 260
+    MAX_LOAD_W = 1200   # 載入時最大尺寸（記憶體 vs 品質平衡）
+    MAX_LOAD_H = 900
 
     def __init__(self, parent: tk.Widget, cfg: dict):
         self._parent = parent
@@ -75,39 +75,52 @@ class EditorTab:
 
     def _build_ui(self):
         tab = self._parent
+        _font = ("Microsoft JhengHei", 13)
 
-        # 載入檔案
-        f_load = ttk.LabelFrame(tab, text=" 載入檔案 ", padding=8)
-        f_load.pack(fill="x", pady=(0, 8))
+        # 左右分割容器
+        container = ttk.Frame(tab)
+        container.pack(fill="both", expand=True)
+
+        # 左側：載入 + 預覽（可伸縮）
+        left = ttk.Frame(container)
+        left.pack(side="left", fill="both", expand=True, padx=(0, 6))
+
+        # 右側：控制區（固定寬）
+        right = ttk.Frame(container, width=310)
+        right.pack(side="right", fill="y")
+        right.pack_propagate(False)
+
+        # ===== 左側 =====
+
+        f_load = ttk.LabelFrame(left, text=" 載入檔案 ", padding=8)
+        f_load.pack(fill="x", pady=(0, 6))
         f_load.columnconfigure(0, weight=1)
         self._src_var = tk.StringVar(value="")
         ttk.Entry(f_load, textvariable=self._src_var,
-                  state="readonly", width=40).grid(row=0, column=0, sticky="ew", padx=(0, 8))
+                  state="readonly", font=_font).grid(row=0, column=0, sticky="ew", padx=(0, 8))
         ttk.Button(f_load, text="開啟", width=6,
                    command=self._open_file).grid(row=0, column=1)
-        self._info_label = ttk.Label(f_load, text="", foreground="gray",
-                                     font=("Microsoft JhengHei", 9))
+        self._info_label = ttk.Label(f_load, text="", style="Hint.TLabel")
         self._info_label.grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 0))
 
-        # 預覽
-        f_preview = ttk.LabelFrame(tab, text=" 預覽 ", padding=8)
-        f_preview.pack(fill="x", pady=(0, 8))
-        self._canvas = tk.Canvas(f_preview, width=self.PREVIEW_W,
-                                 height=self.PREVIEW_H, bg="#1a1a1a",
-                                 highlightthickness=0)
-        self._canvas.pack()
+        f_preview = ttk.LabelFrame(left, text=" 預覽 ", padding=4)
+        f_preview.pack(fill="both", expand=True, pady=(0, 6))
+        self._canvas = tk.Canvas(f_preview, bg="#1a1a1a", highlightthickness=0)
+        self._canvas.pack(fill="both", expand=True)
         self._photo = None
-        ctrl_row = ttk.Frame(f_preview)
-        ctrl_row.pack(fill="x", pady=(6, 0))
+
+        ctrl_row = ttk.Frame(left)
+        ctrl_row.pack(fill="x", pady=(0, 4))
         self._btn_play = ttk.Button(ctrl_row, text="▶ 播放選取範圍",
                                     command=self._toggle_play, state="disabled")
         self._btn_play.pack(side="left")
-        self._play_label = ttk.Label(ctrl_row, text="", foreground="gray")
+        self._play_label = ttk.Label(ctrl_row, text="", style="Hint.TLabel")
         self._play_label.pack(side="left", padx=8)
 
-        # 裁切範圍
-        f_trim = ttk.LabelFrame(tab, text=" 裁切範圍 ", padding=8)
-        f_trim.pack(fill="x", pady=(0, 8))
+        # ===== 右側 =====
+
+        f_trim = ttk.LabelFrame(right, text=" 裁切範圍 ", padding=8)
+        f_trim.pack(fill="x", pady=(0, 8), padx=4)
         self._start_var = tk.DoubleVar(value=0.0)
         self._end_var = tk.DoubleVar(value=0.0)
 
@@ -115,54 +128,50 @@ class EditorTab:
         ttk.Label(r0, text="起始：", width=5).pack(side="left")
         self._start_scale = ttk.Scale(r0, variable=self._start_var,
                                       from_=0, to=1, orient="horizontal",
-                                      length=300, command=self._on_trim_change)
-        self._start_scale.pack(side="left")
-        self._start_label = ttk.Label(r0, text="0.0 秒", width=8)
+                                      command=self._on_trim_change)
+        self._start_scale.pack(side="left", fill="x", expand=True)
+        self._start_label = ttk.Label(r0, text="0.0 秒", width=7)
         self._start_label.pack(side="left")
 
         r1 = ttk.Frame(f_trim); r1.pack(fill="x", pady=2)
         ttk.Label(r1, text="結束：", width=5).pack(side="left")
         self._end_scale = ttk.Scale(r1, variable=self._end_var,
                                     from_=0, to=1, orient="horizontal",
-                                    length=300, command=self._on_trim_change)
-        self._end_scale.pack(side="left")
-        self._end_label = ttk.Label(r1, text="0.0 秒", width=8)
+                                    command=self._on_trim_change)
+        self._end_scale.pack(side="left", fill="x", expand=True)
+        self._end_label = ttk.Label(r1, text="0.0 秒", width=7)
         self._end_label.pack(side="left")
 
         self._trim_info = ttk.Label(f_trim, text="", foreground="#2980b9")
         self._trim_info.pack(anchor="w")
 
-        # 播放速度
-        f_speed = ttk.LabelFrame(tab, text=" 播放速度 ", padding=8)
-        f_speed.pack(fill="x", pady=(0, 8))
+        f_speed = ttk.LabelFrame(right, text=" 播放速度 ", padding=8)
+        f_speed.pack(fill="x", pady=(0, 8), padx=4)
         self._speed_var = tk.DoubleVar(value=1.0)
         sr = ttk.Frame(f_speed); sr.pack(fill="x")
         for label, val in (("0.25x", 0.25), ("0.5x", 0.5), ("1x", 1.0),
                             ("1.5x", 1.5), ("2x", 2.0)):
             ttk.Radiobutton(sr, text=label, variable=self._speed_var,
-                            value=val, command=self._on_trim_change).pack(side="left", padx=4)
-        self._duration_label = ttk.Label(f_speed, text="", foreground="gray")
+                            value=val, command=self._on_trim_change).pack(side="left", padx=1)
+        self._duration_label = ttk.Label(f_speed, text="", style="Hint.TLabel")
         self._duration_label.pack(anchor="w", pady=(4, 0))
 
-        # 匯出設定
-        f_export = ttk.LabelFrame(tab, text=" 匯出設定 ", padding=8)
-        f_export.pack(fill="x", pady=(0, 8))
+        f_export = ttk.LabelFrame(right, text=" 匯出設定 ", padding=8)
+        f_export.pack(fill="x", pady=(0, 8), padx=4)
         er = ttk.Frame(f_export); er.pack(fill="x")
-        ttk.Label(er, text="輸出格式：").pack(side="left")
+        ttk.Label(er, text="格式：").pack(side="left")
         self._export_fmt_var = tk.StringVar(value="source")
-        for text, val in (("GIF", "gif"), ("MP4", "mp4"), ("同來源格式", "source")):
+        for text, val in (("GIF", "gif"), ("MP4", "mp4"), ("同來源", "source")):
             ttk.Radiobutton(er, text=text, variable=self._export_fmt_var,
-                            value=val, command=self._update_size_estimate).pack(side="left", padx=4)
-        self._size_label = ttk.Label(f_export, text="", foreground="gray",
-                                     font=("Microsoft JhengHei", 9))
+                            value=val, command=self._update_size_estimate).pack(side="left", padx=3)
+        self._size_label = ttk.Label(f_export, text="", style="Hint.TLabel")
         self._size_label.pack(anchor="w", pady=(4, 0))
 
-        ttk.Button(tab, text="✂  匯出", command=self._export,
-                   state="disabled").pack(ipady=6, pady=(0, 8))
-        self._btn_export = tab.winfo_children()[-1]
+        ttk.Button(right, text="✂  匯出", command=self._export,
+                   state="disabled").pack(fill="x", ipady=8, pady=(0, 8), padx=4)
+        self._btn_export = right.winfo_children()[-1]
 
-        # 輸出結果
-        self._f_result = ttk.LabelFrame(tab, text=" 輸出結果 ", padding=8)
+        self._f_result = ttk.LabelFrame(right, text=" 輸出結果 ", padding=8)
         self._result_label = ttk.Label(self._f_result, text="")
         self._result_label.pack(anchor="w")
         ttk.Button(self._f_result, text="開啟資料夾",
@@ -208,7 +217,7 @@ class EditorTab:
                 fps = max(1, int(1000 / duration_ms))
                 while True:
                     frame = gif.convert("RGB").copy()
-                    frame.thumbnail((self.PREVIEW_W, self.PREVIEW_H), Image.LANCZOS)
+                    frame.thumbnail((self.MAX_LOAD_W, self.MAX_LOAD_H), Image.LANCZOS)
                     frames.append(frame)
                     gif.seek(gif.tell() + 1)
             except EOFError:
@@ -220,7 +229,7 @@ class EditorTab:
         tmp_dir = tempfile.mkdtemp()
         try:
             cmd = [ffmpeg, "-i", path, "-vf",
-                   f"scale={self.PREVIEW_W}:-2",
+                   f"scale={self.MAX_LOAD_W}:-2",
                    "-r", "15",
                    os.path.join(tmp_dir, "frame_%06d.png"),
                    "-y"]
@@ -240,7 +249,6 @@ class EditorTab:
         self._info_label.config(
             text=f"{os.path.splitext(self._src_path)[1].upper().lstrip('.')}｜"
                  f"{w}×{h}｜{total:.1f} 秒｜{self._fps} fps",
-            foreground="gray"
         )
         self._start_scale.config(to=total)
         self._end_scale.config(to=total)
@@ -257,12 +265,12 @@ class EditorTab:
         if not self._frames or idx >= len(self._frames):
             return
         img = self._frames[idx].copy()
-        img.thumbnail((self.PREVIEW_W, self.PREVIEW_H), Image.LANCZOS)
+        cw = max(self._canvas.winfo_width(), 200)
+        ch = max(self._canvas.winfo_height(), 150)
+        img.thumbnail((cw, ch), Image.LANCZOS)
         self._photo = ImageTk.PhotoImage(img)
         self._canvas.delete("all")
-        cx = self.PREVIEW_W // 2
-        cy = self.PREVIEW_H // 2
-        self._canvas.create_image(cx, cy, anchor="center", image=self._photo)
+        self._canvas.create_image(cw // 2, ch // 2, anchor="center", image=self._photo)
 
     def _toggle_play(self):
         if self._play_job:

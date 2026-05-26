@@ -39,8 +39,8 @@ class SnapGIFClipApp:
         self.root = root
         self.root.title("SnapGIFClip")
         self.root.resizable(True, True)
-        self.root.minsize(520, 500)
-        self.root.geometry("580x680")
+        self.root.minsize(640, 560)
+        self.root.geometry("920x740")
 
         self.msg_queue: queue.Queue = queue.Queue()
         self._recorder = None
@@ -112,9 +112,10 @@ class SnapGIFClipApp:
         f_folder = ttk.LabelFrame(tab, text=" 輸出資料夾 ", padding=8)
         f_folder.pack(fill="x", pady=(0, 10))
         f_folder.columnconfigure(0, weight=1)
+        _font = ("Microsoft JhengHei", 13)
         self._folder_var = tk.StringVar(value=self._cfg["output_folder"])
         ttk.Entry(f_folder, textvariable=self._folder_var,
-                  state="readonly", width=38).grid(row=0, column=0, sticky="ew", padx=(0, 8))
+                  state="readonly", width=38, font=_font).grid(row=0, column=0, sticky="ew", padx=(0, 8))
         ttk.Button(f_folder, text="變更", width=6,
                    command=self._change_folder).grid(row=0, column=1)
 
@@ -123,11 +124,11 @@ class SnapGIFClipApp:
         f_hotkey.pack(fill="x", pady=(0, 10))
         self._hotkey_var = tk.StringVar(value=self._cfg["hotkey"])
         hk_entry = ttk.Entry(f_hotkey, textvariable=self._hotkey_var,
-                             state="readonly", width=22)
+                             state="readonly", width=22, font=_font)
         hk_entry.pack(side="left")
         hk_entry.bind("<Button-1>", self._start_hotkey_capture)
         ttk.Label(f_hotkey, text="  ⓘ 點擊方框後按下新組合鍵",
-                  foreground="gray").pack(side="left")
+                  style="Hint.TLabel").pack(side="left")
 
         # 錄製設定
         f_rec = ttk.LabelFrame(tab, text=" 錄製設定 ", padding=8)
@@ -138,7 +139,7 @@ class SnapGIFClipApp:
         ttk.Label(row0, text="預設秒數：").pack(side="left")
         self._duration_var = tk.IntVar(value=self._cfg["default_duration"])
         ttk.Spinbox(row0, from_=1, to=300, width=6,
-                    textvariable=self._duration_var).pack(side="left")
+                    textvariable=self._duration_var, font=_font).pack(side="left")
         ttk.Label(row0, text=" 秒").pack(side="left")
 
         row1 = ttk.Frame(f_rec)
@@ -150,7 +151,7 @@ class SnapGIFClipApp:
                             value=v, command=self._save_settings).pack(side="left", padx=4)
         ttk.Label(row1, text="  自訂：").pack(side="left")
         ttk.Spinbox(row1, from_=1, to=60, width=5,
-                    textvariable=self._fps_var).pack(side="left")
+                    textvariable=self._fps_var, font=_font).pack(side="left")
 
         row2 = ttk.Frame(f_rec)
         row2.pack(fill="x", pady=(0, 6))
