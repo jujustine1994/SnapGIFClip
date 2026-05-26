@@ -38,8 +38,9 @@ class SnapGIFClipApp:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title("SnapGIFClip")
-        self.root.resizable(False, False)
-        self.root.attributes("-topmost", True)
+        self.root.resizable(True, True)
+        self.root.minsize(520, 400)
+        self.root.geometry("560x500")
 
         self.msg_queue: queue.Queue = queue.Queue()
         self._recorder = None
@@ -79,6 +80,7 @@ class SnapGIFClipApp:
         style.configure("TCheckbutton",       font=font_main)
         style.configure("TRadiobutton",       font=font_main)
         style.configure("TLabelframe.Label",  font=font_main, foreground="#1A6BAF")
+        style.configure("TNotebook.Tab",      font=font_main)
         style.configure("Hint.TLabel",        font=font_hint, foreground="#888888")
 
     # ---- UI ----
