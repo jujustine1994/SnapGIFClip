@@ -12,7 +12,8 @@ from tkinter import ttk, filedialog
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BIN_DIR = os.path.join(SCRIPT_DIR, "..", "bin")
-DEFAULT_FFMPEG = os.path.join(BIN_DIR, "ffmpeg.exe")
+_bin_ffmpeg = os.path.join(BIN_DIR, "ffmpeg.exe")
+DEFAULT_FFMPEG = _bin_ffmpeg if os.path.exists(_bin_ffmpeg) else (shutil.which("ffmpeg") or _bin_ffmpeg)
 
 
 # ---- 純計算函式 ----

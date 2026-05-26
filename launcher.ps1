@@ -101,6 +101,12 @@ if (-not (Test-Path "venv")) {
 Write-Host "[4/4] 檢查 ffmpeg..." -ForegroundColor Cyan
 $ffmpegPath = Join-Path $ScriptDir "bin\ffmpeg.exe"
 if (-not (Test-Path $ffmpegPath)) {
+    # 先查系統 PATH，找到就直接用，不重複下載
+    $systemFfmpeg = Get-Command ffmpeg -ErrorAction SilentlyContinue
+    if ($systemFfmpeg) {
+        Write-Host "[OK] 偵測到系統 ffmpeg：$($systemFfmpeg.Source)" -ForegroundColor Green
+        $ffmpegPath = $systemFfmpeg.Source
+    } else {
     Write-Host ""
     Write-Host "  !! 缺少元件：ffmpeg" -ForegroundColor Yellow
     Write-Host "     ffmpeg 是 MP4 輸出所需的影片處理工具，約 80 MB。" -ForegroundColor Gray
@@ -135,6 +141,7 @@ if (-not (Test-Path $ffmpegPath)) {
     } else {
         Write-Host "[INFO] 跳過 ffmpeg，MP4 功能停用。" -ForegroundColor Gray
     }
+    } # end: 系統 PATH 未找到
 } else {
     Write-Host "[OK] ffmpeg 已就緒。" -ForegroundColor Green
 }
