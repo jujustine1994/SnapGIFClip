@@ -330,9 +330,14 @@ class SnapGIFClipApp:
         self._progress_bar.pack(fill="x")
         self._progress_label = ttk.Label(self._f_progress, text="0.0 / 0 秒")
         self._progress_label.pack(anchor="w", pady=(4, 0))
+        btn_row = ttk.Frame(self._f_progress)
+        btn_row.pack(pady=(6, 0))
         self._btn_stop = ttk.Button(
-            self._f_progress, text="⏹  提早停止", command=self._stop_recording)
-        self._btn_stop.pack(pady=(6, 0), ipady=4)
+            btn_row, text="⏹  提早停止", command=self._stop_recording)
+        self._btn_stop.pack(side="left", padx=(0, 8), ipady=4)
+        self._btn_discard = ttk.Button(
+            btn_row, text="🗑  廢棄", command=self._discard_recording)
+        self._btn_discard.pack(side="left", ipady=4)
 
         # 最後輸出（隱藏）
         self._f_output = ttk.LabelFrame(tab, text=" 最後輸出 ", padding=8)
@@ -401,6 +406,10 @@ class SnapGIFClipApp:
         if self._recorder:
             self._recorder.stop()
 
+    def _discard_recording(self):
+        if self._recorder:
+            self._recorder.discard()
+
     def _start_hotkey_listener_stop_mode(self):
         if self._listener:
             try:
@@ -457,6 +466,12 @@ class SnapGIFClipApp:
 
             if error:
                 self._status_label.config(text=f"❌ 錯誤：{error}", foreground="#e74c3c")
+                return
+
+            # 廢棄：paths 為空且無 error，靜默重置
+            if not paths:
+                self._status_label.config(text="● 就緒", foreground="#27ae60")
+                self._hotkey_hint.config(text=f"按下 {cfg['hotkey'].upper()} 開始框選")
                 return
 
             for lbl in self._output_labels:

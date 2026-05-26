@@ -42,6 +42,8 @@ def encode_gif(frames: list, output_path: str, fps: int,
 def encode_mp4(frames: list, output_path: str, fps: int,
                crf: int, ffmpeg_path: str = DEFAULT_FFMPEG):
     """給定 PIL Image 列表，輸出 MP4 到 output_path（需要 ffmpeg）。"""
+    if not frames:
+        raise ValueError("frames is empty")
     tmp_dir = tempfile.mkdtemp()
     try:
         for i, frame in enumerate(frames):
@@ -53,6 +55,8 @@ def encode_mp4(frames: list, output_path: str, fps: int,
             "-c:v", "libx264",
             "-crf", str(crf),
             "-pix_fmt", "yuv420p",
+            # yuv420p 要求寬高為偶數，自動補齊
+            "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
             output_path,
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)
@@ -95,12 +99,17 @@ class Recorder:
         self.on_done = on_done
         self.ffmpeg_path = ffmpeg_path
         self._stop_event = threading.Event()
+        self._discard = False
 
     def start(self):
         t = threading.Thread(target=self._run, daemon=True)
         t.start()
 
     def stop(self):
+        self._stop_event.set()
+
+    def discard(self):
+        self._discard = True
         self._stop_event.set()
 
     def _run(self):
@@ -127,6 +136,11 @@ class Recorder:
                 sleep = interval - (time.time() - frame_start)
                 if sleep > 0:
                     time.sleep(sleep)
+
+        if self._discard:
+            if self.on_done:
+                self.on_done([], None)
+            return
 
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         paths, error = [], None
