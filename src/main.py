@@ -53,20 +53,33 @@ class SnapGIFClipApp:
         except ImportError:
             pass
 
-        self._apply_font()
+        self._apply_styles()
         self._build_ui()
         self._start_hotkey_listener(self._cfg["hotkey"])
         self._poll_queue()
 
-    # ---- 字型 ----
+    # ---- 樣式 ----
 
-    def _apply_font(self):
+    def _apply_styles(self):
         from tkinter import font as tkfont
         for name in ("TkDefaultFont", "TkTextFont", "TkMenuFont"):
             try:
-                tkfont.nametofont(name).configure(family="Microsoft JhengHei", size=11)
+                tkfont.nametofont(name).configure(family="Microsoft JhengHei", size=13)
             except Exception:
                 pass
+
+        style = ttk.Style()
+        font_main = ("Microsoft JhengHei", 13)
+        font_hint = ("Microsoft JhengHei", 11)
+        style.configure("TButton",            font=font_main)
+        style.configure("TEntry",             font=font_main)
+        style.configure("TCombobox",          font=font_main)
+        style.configure("TSpinbox",           font=font_main)
+        style.configure("TLabel",             font=font_main)
+        style.configure("TCheckbutton",       font=font_main)
+        style.configure("TRadiobutton",       font=font_main)
+        style.configure("TLabelframe.Label",  font=font_main, foreground="#1A6BAF")
+        style.configure("Hint.TLabel",        font=font_hint, foreground="#888888")
 
     # ---- UI ----
 
@@ -295,7 +308,7 @@ class SnapGIFClipApp:
         self._hotkey_hint = ttk.Label(
             f_status,
             text=f"按下 {self._cfg['hotkey'].upper()} 開始框選",
-            foreground="gray", font=("Microsoft JhengHei", 9),
+            style="Hint.TLabel",
         )
         self._hotkey_hint.pack(anchor="w")
 
