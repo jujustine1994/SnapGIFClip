@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.log
+cache/
+bin/ffmpeg.exe
+src/config.json
