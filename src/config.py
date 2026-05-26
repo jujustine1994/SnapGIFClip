@@ -8,6 +8,7 @@ CONFIG_PATH = os.environ.get("SNAPGIFCLIP_CONFIG") or os.path.join(SCRIPT_DIR, "
 DEFAULT = {
     "output_folder": os.path.join(os.path.expanduser("~"), "Desktop"),
     "hotkey": "ctrl+shift+g",
+    "record_mode": "fixed",
     "default_duration": 10,
     "fps": 15,
     "scale": 1.0,

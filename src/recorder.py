@@ -121,7 +121,7 @@ class Recorder:
         with mss.mss() as sct:
             while not self._stop_event.is_set():
                 elapsed = time.time() - start_time
-                if elapsed >= self.duration:
+                if self.duration > 0 and elapsed >= self.duration:
                     break
                 frame_start = time.time()
                 raw = sct.grab(self.region)

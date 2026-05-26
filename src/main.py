@@ -123,24 +123,17 @@ class SnapGIFClipApp:
         f_hotkey = ttk.LabelFrame(tab, text=" 快捷鍵 ", padding=8)
         f_hotkey.pack(fill="x", pady=(0, 10))
         self._hotkey_var = tk.StringVar(value=self._cfg["hotkey"])
-        hk_entry = ttk.Entry(f_hotkey, textvariable=self._hotkey_var,
-                             state="readonly", width=22, font=_font)
-        hk_entry.pack(side="left")
-        hk_entry.bind("<Button-1>", self._start_hotkey_capture)
-        ttk.Label(f_hotkey, text="  ⓘ 點擊方框後按下新組合鍵",
-                  style="Hint.TLabel").pack(side="left")
+        self._hk_entry = ttk.Entry(f_hotkey, textvariable=self._hotkey_var,
+                                   state="readonly", width=22, font=_font)
+        self._hk_entry.pack(side="left")
+        self._hk_entry.bind("<Button-1>", self._start_hotkey_capture)
+        self._hk_hint_label = ttk.Label(f_hotkey, text="  ⓘ 點擊方框後按下新組合鍵",
+                                        style="Hint.TLabel")
+        self._hk_hint_label.pack(side="left")
 
         # 錄製設定
         f_rec = ttk.LabelFrame(tab, text=" 錄製設定 ", padding=8)
         f_rec.pack(fill="x", pady=(0, 10))
-
-        row0 = ttk.Frame(f_rec)
-        row0.pack(fill="x", pady=(0, 6))
-        ttk.Label(row0, text="預設秒數：").pack(side="left")
-        self._duration_var = tk.IntVar(value=self._cfg["default_duration"])
-        ttk.Spinbox(row0, from_=1, to=300, width=6,
-                    textvariable=self._duration_var, font=_font).pack(side="left")
-        ttk.Label(row0, text=" 秒").pack(side="left")
 
         row1 = ttk.Frame(f_rec)
         row1.pack(fill="x", pady=(0, 6))
@@ -173,7 +166,7 @@ class SnapGIFClipApp:
                    command=self._open_advanced).pack(pady=(6, 0))
 
         # 自動儲存 traces
-        for var in (self._duration_var, self._fps_var, self._scale_var):
+        for var in (self._fps_var, self._scale_var):
             var.trace_add("write", lambda *_: self._save_settings())
 
     def _change_folder(self):
@@ -187,12 +180,15 @@ class SnapGIFClipApp:
             cfg = config.load()
             cfg["output_folder"]    = self._folder_var.get()
             cfg["hotkey"]           = self._hotkey_var.get()
+            cfg["record_mode"]      = self._mode_var.get()
             cfg["default_duration"] = int(self._duration_var.get())
             cfg["fps"]              = int(self._fps_var.get())
             cfg["scale"]            = float(self._scale_var.get())
             cfg["countdown"]        = bool(self._countdown_var.get())
             config.save(cfg)
             self._cfg = cfg
+            self._hotkey_hint.config(
+                text=f"按下 {cfg['hotkey'].upper()} 開始框選")
         except Exception:
             pass
 
@@ -251,26 +247,44 @@ class SnapGIFClipApp:
     # ---- 快捷鍵設定捕捉 ----
 
     def _start_hotkey_capture(self, _event=None):
-        self._hotkey_var.set("請按下新快捷鍵...")
-        self.root.bind("<KeyPress>", self._capture_hotkey_press)
+        self._hk_entry.config(state="normal")
+        self._hotkey_var.set("請按下組合鍵...")
+        self._hk_hint_label.config(text="  按 Esc 取消")
+        self._hk_entry.focus_set()
+        self._hk_entry.bind("<KeyPress>", self._capture_hotkey_press)
+        self._hk_entry.bind("<FocusOut>", self._cancel_hotkey_capture)
+
+    def _cancel_hotkey_capture(self, _event=None):
+        self._hk_entry.unbind("<KeyPress>")
+        self._hk_entry.unbind("<FocusOut>")
+        self._hotkey_var.set(self._cfg["hotkey"])
+        self._hk_entry.config(state="readonly")
+        self._hk_hint_label.config(text="  ⓘ 點擊方框後按下新組合鍵")
 
     def _capture_hotkey_press(self, event):
-        self.root.unbind("<KeyPress>")
+        if event.keysym == "Escape":
+            self._cancel_hotkey_capture()
+            return "break"
         parts = []
-        if event.state & 0x4:  parts.append("ctrl")
-        if event.state & 0x1:  parts.append("shift")
-        if event.state & 0x20000: parts.append("alt")
+        if event.state & 0x4:   parts.append("ctrl")
+        if event.state & 0x1:   parts.append("shift")
+        if event.state & 0x8:   parts.append("alt")
         key = event.keysym.lower()
-        if key not in ("control_l", "control_r", "shift_l", "shift_r",
-                       "alt_l", "alt_r"):
-            parts.append(key)
-        if len(parts) >= 2:
-            new_hk = "+".join(parts)
-            self._hotkey_var.set(new_hk)
-            self._start_hotkey_listener(new_hk)
-            self._save_settings()
-        else:
-            self._hotkey_var.set(self._cfg["hotkey"])
+        if key in ("control_l", "control_r", "shift_l", "shift_r",
+                   "alt_l", "alt_r", "super_l", "super_r"):
+            return "break"
+        if not parts:
+            return "break"
+        parts.append(key)
+        new_hk = "+".join(parts)
+        self._hk_entry.unbind("<KeyPress>")
+        self._hk_entry.unbind("<FocusOut>")
+        self._hotkey_var.set(new_hk)
+        self._hk_entry.config(state="readonly")
+        self._hk_hint_label.config(text="  ⓘ 點擊方框後按下新組合鍵")
+        self._start_hotkey_listener(new_hk)
+        self._save_settings()
+        return "break"
 
     # ---- pynput 監聽 ----
 
@@ -323,6 +337,30 @@ class SnapGIFClipApp:
             ttk.Radiobutton(f_fmt, text=text, variable=self._format_var,
                             value=val).pack(side="left", padx=8)
 
+        # 錄製模式
+        f_mode = ttk.LabelFrame(tab, text=" 錄製模式 ", padding=8)
+        f_mode.pack(fill="x", pady=(0, 8))
+        self._mode_var = tk.StringVar(value=self._cfg.get("record_mode", "fixed"))
+        _font = ("Microsoft JhengHei", 13)
+        self._duration_var = tk.IntVar(value=self._cfg["default_duration"])
+
+        row_fixed = ttk.Frame(f_mode)
+        row_fixed.pack(fill="x", pady=(0, 4))
+        ttk.Radiobutton(row_fixed, text="固定秒數：", variable=self._mode_var,
+                        value="fixed", command=self._on_mode_change).pack(side="left")
+        self._duration_spinbox = ttk.Spinbox(
+            row_fixed, from_=1, to=300, width=6,
+            textvariable=self._duration_var, font=_font)
+        self._duration_spinbox.pack(side="left")
+        ttk.Label(row_fixed, text=" 秒").pack(side="left")
+
+        ttk.Radiobutton(f_mode, text="手動停止（再按快捷鍵停止）",
+                        variable=self._mode_var,
+                        value="manual", command=self._on_mode_change).pack(anchor="w")
+
+        self._on_mode_change()  # 初始化 spinbox 狀態
+        self._duration_var.trace_add("write", lambda *_: self._save_settings())
+
         # 錄製進度（隱藏）
         self._f_progress = ttk.LabelFrame(tab, text=" 錄製進度 ", padding=8)
         self._progress_bar = ttk.Progressbar(
@@ -372,7 +410,8 @@ class SnapGIFClipApp:
     def _on_region_selected(self, x1: int, y1: int, x2: int, y2: int):
         cfg = config.load()
         region = {"top": y1, "left": x1, "width": x2 - x1, "height": y2 - y1}
-        duration = cfg["default_duration"]
+        mode = self._mode_var.get()
+        duration = int(self._duration_var.get()) if mode == "fixed" else 0
 
         from src.overlay import RecordingBorder
         self._border = RecordingBorder(self.root, x1, y1, x2, y2)
@@ -380,9 +419,15 @@ class SnapGIFClipApp:
         # 顯示進度區
         self._f_progress.pack(fill="x", pady=(0, 8))
         self._f_output.pack_forget()
-        self._progress_bar["maximum"] = duration
-        self._progress_bar["value"] = 0
-        self._progress_label.config(text=f"0.0 / {duration} 秒")
+        if mode == "fixed":
+            self._progress_bar.config(mode="determinate", maximum=duration)
+            self._progress_bar["value"] = 0
+            self._progress_label.config(text=f"0.0 / {duration} 秒")
+        else:
+            self._progress_bar.config(mode="indeterminate", maximum=100)
+            self._progress_bar.start(50)
+            self._progress_label.config(text="錄製中... 按快捷鍵停止")
+        self._recording_mode = mode
         self._status_label.config(text="● 錄製中...", foreground="#e74c3c")
 
         from src.recorder import Recorder
@@ -401,6 +446,13 @@ class SnapGIFClipApp:
         )
         self._recorder.start()
         self._start_hotkey_listener_stop_mode()
+
+    def _on_mode_change(self):
+        if self._mode_var.get() == "fixed":
+            self._duration_spinbox.config(state="normal")
+        else:
+            self._duration_spinbox.config(state="disabled")
+        self._save_settings()
 
     def _stop_recording(self):
         if self._recorder:
@@ -450,13 +502,15 @@ class SnapGIFClipApp:
         cfg = config.load()
         if msg_type == "progress":
             elapsed = data
-            duration = cfg["default_duration"]
-            self._progress_bar["value"] = min(elapsed, duration)
-            self._progress_label.config(
-                text=f"{elapsed:.1f} / {duration} 秒"
-            )
+            if getattr(self, "_recording_mode", "fixed") == "fixed":
+                duration = int(self._duration_var.get())
+                self._progress_bar["value"] = min(elapsed, duration)
+                self._progress_label.config(text=f"{elapsed:.1f} / {duration} 秒")
+            else:
+                self._progress_label.config(text=f"錄製中... {elapsed:.1f} 秒")
         elif msg_type == "done":
             paths, error = data
+            self._progress_bar.stop()
             if self._border:
                 self._border.destroy()
                 self._border = None

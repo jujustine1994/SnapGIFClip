@@ -86,7 +86,7 @@ class EditorTab:
         left.pack(side="left", fill="both", expand=True, padx=(0, 6))
 
         # 右側：控制區（固定寬）
-        right = ttk.Frame(container, width=310)
+        right = ttk.Frame(container, width=380)
         right.pack(side="right", fill="y")
         right.pack_propagate(False)
 
@@ -148,11 +148,14 @@ class EditorTab:
         f_speed = ttk.LabelFrame(right, text=" 播放速度 ", padding=8)
         f_speed.pack(fill="x", pady=(0, 8), padx=4)
         self._speed_var = tk.DoubleVar(value=1.0)
-        sr = ttk.Frame(f_speed); sr.pack(fill="x")
-        for label, val in (("0.25x", 0.25), ("0.5x", 0.5), ("1x", 1.0),
-                            ("1.5x", 1.5), ("2x", 2.0)):
-            ttk.Radiobutton(sr, text=label, variable=self._speed_var,
-                            value=val, command=self._on_trim_change).pack(side="left", padx=1)
+        sr1 = ttk.Frame(f_speed); sr1.pack(fill="x")
+        for label, val in (("0.25x", 0.25), ("0.5x", 0.5), ("1x", 1.0)):
+            ttk.Radiobutton(sr1, text=label, variable=self._speed_var,
+                            value=val, command=self._on_trim_change).pack(side="left", padx=2)
+        sr2 = ttk.Frame(f_speed); sr2.pack(fill="x", pady=(2, 0))
+        for label, val in (("1.5x", 1.5), ("2x", 2.0)):
+            ttk.Radiobutton(sr2, text=label, variable=self._speed_var,
+                            value=val, command=self._on_trim_change).pack(side="left", padx=2)
         self._duration_label = ttk.Label(f_speed, text="", style="Hint.TLabel")
         self._duration_label.pack(anchor="w", pady=(4, 0))
 
