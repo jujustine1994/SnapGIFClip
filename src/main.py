@@ -285,8 +285,48 @@ class SnapGIFClipApp:
     # ================================================================
 
     def _build_main_tab(self):
-        ttk.Label(self._tab_main,
-                  text="主要工作 Tab（Task 7 實作）").pack()
+        tab = self._tab_main
+
+        # 狀態
+        f_status = ttk.LabelFrame(tab, text=" 狀態 ", padding=8)
+        f_status.pack(fill="x", pady=(0, 8))
+        self._status_label = ttk.Label(f_status, text="● 就緒", foreground="#27ae60")
+        self._status_label.pack(anchor="w")
+        self._hotkey_hint = ttk.Label(
+            f_status,
+            text=f"按下 {self._cfg['hotkey'].upper()} 開始框選",
+            foreground="gray", font=("Microsoft JhengHei", 9),
+        )
+        self._hotkey_hint.pack(anchor="w")
+
+        # 輸出格式
+        f_fmt = ttk.LabelFrame(tab, text=" 輸出格式 ", padding=8)
+        f_fmt.pack(fill="x", pady=(0, 8))
+        self._format_var = tk.StringVar(value="both")
+        for text, val in (("GIF", "gif"), ("MP4", "mp4"), ("GIF + MP4", "both")):
+            ttk.Radiobutton(f_fmt, text=text, variable=self._format_var,
+                            value=val).pack(side="left", padx=8)
+
+        # 錄製進度（隱藏）
+        self._f_progress = ttk.LabelFrame(tab, text=" 錄製進度 ", padding=8)
+        self._progress_bar = ttk.Progressbar(
+            self._f_progress, mode="determinate", length=280)
+        self._progress_bar.pack(fill="x")
+        self._progress_label = ttk.Label(self._f_progress, text="0.0 / 0 秒")
+        self._progress_label.pack(anchor="w", pady=(4, 0))
+        self._btn_stop = ttk.Button(
+            self._f_progress, text="⏹  提早停止", command=self._stop_recording)
+        self._btn_stop.pack(pady=(6, 0), ipady=4)
+
+        # 最後輸出（隱藏）
+        self._f_output = ttk.LabelFrame(tab, text=" 最後輸出 ", padding=8)
+        self._output_labels: list = []
+        self._btn_open_folder = ttk.Button(
+            self._f_output, text="📂  開啟資料夾",
+            command=self._open_output_folder)
+        self._btn_open_folder.pack(pady=(4, 0))
+
+        self._last_output_folder = ""
 
     def _build_editor_tab(self):
         try:
@@ -295,10 +335,80 @@ class SnapGIFClipApp:
         except (ImportError, AttributeError):
             ttk.Label(self._tab_editor, text="影像編輯 Tab（Task 8 實作）").pack()
 
-    # ---- 觸發錄製（Task 7 實作）----
+    # ---- 觸發錄製 ----
 
     def _trigger_recording(self):
-        pass
+        if self._recorder is not None:
+            return  # 已在錄製中
+        cfg = config.load()
+        from src.overlay import FullscreenOverlay
+        FullscreenOverlay(
+            self.root,
+            countdown=cfg["countdown"],
+            on_complete=self._on_region_selected,
+        )
+
+    def _on_region_selected(self, x1: int, y1: int, x2: int, y2: int):
+        cfg = config.load()
+        region = {"top": y1, "left": x1, "width": x2 - x1, "height": y2 - y1}
+        duration = cfg["default_duration"]
+
+        from src.overlay import RecordingBorder
+        self._border = RecordingBorder(self.root, x1, y1, x2, y2)
+
+        # 顯示進度區
+        self._f_progress.pack(fill="x", pady=(0, 8))
+        self._f_output.pack_forget()
+        self._progress_bar["maximum"] = duration
+        self._progress_bar["value"] = 0
+        self._progress_label.config(text=f"0.0 / {duration} 秒")
+        self._status_label.config(text="● 錄製中...", foreground="#e74c3c")
+
+        from src.recorder import Recorder
+        self._recorder = Recorder(
+            region=region,
+            fps=cfg["fps"],
+            scale=cfg["scale"],
+            duration=duration,
+            output_folder=cfg["output_folder"],
+            output_format=self._format_var.get(),
+            gif_colors=cfg["gif"]["colors"],
+            gif_dither=cfg["gif"]["dithering"],
+            mp4_crf=cfg["mp4"]["crf"],
+            on_progress=lambda e: self.msg_queue.put(("progress", e)),
+            on_done=lambda paths, err: self.msg_queue.put(("done", (paths, err))),
+        )
+        self._recorder.start()
+        self._start_hotkey_listener_stop_mode()
+
+    def _stop_recording(self):
+        if self._recorder:
+            self._recorder.stop()
+
+    def _start_hotkey_listener_stop_mode(self):
+        if self._listener:
+            try:
+                self._listener.stop()
+            except Exception:
+                pass
+        try:
+            from pynput import keyboard
+            cfg = config.load()
+            parts = cfg["hotkey"].split("+")
+            pynput_str = "+".join(f"<{p}>" if len(p) > 1 else p for p in parts)
+
+            def on_stop():
+                self.root.after(0, self._stop_recording)
+
+            self._listener = keyboard.GlobalHotKeys({pynput_str: on_stop})
+            self._listener.daemon = True
+            self._listener.start()
+        except Exception:
+            pass
+
+    def _open_output_folder(self):
+        if self._last_output_folder and os.path.exists(self._last_output_folder):
+            os.startfile(self._last_output_folder)
 
     # ---- Queue poll ----
 
@@ -312,7 +422,39 @@ class SnapGIFClipApp:
         self.root.after(100, self._poll_queue)
 
     def _handle_msg(self, msg_type: str, data):
-        pass  # Task 7 實作
+        cfg = config.load()
+        if msg_type == "progress":
+            elapsed = data
+            duration = cfg["default_duration"]
+            self._progress_bar["value"] = min(elapsed, duration)
+            self._progress_label.config(
+                text=f"{elapsed:.1f} / {duration} 秒"
+            )
+        elif msg_type == "done":
+            paths, error = data
+            if self._border:
+                self._border.destroy()
+                self._border = None
+            self._recorder = None
+            self._f_progress.pack_forget()
+            self._start_hotkey_listener(cfg["hotkey"])
+
+            if error:
+                self._status_label.config(text=f"❌ 錯誤：{error}", foreground="#e74c3c")
+                return
+
+            for lbl in self._output_labels:
+                lbl.destroy()
+            self._output_labels.clear()
+            for p in paths:
+                lbl = ttk.Label(self._f_output, text=f"📄 {os.path.basename(p)}",
+                                foreground="#2980b9")
+                lbl.pack(anchor="w")
+                self._output_labels.append(lbl)
+            self._last_output_folder = os.path.dirname(paths[0]) if paths else ""
+            self._f_output.pack(fill="x", pady=(0, 8))
+            self._status_label.config(text="● 就緒", foreground="#27ae60")
+            self._hotkey_hint.config(text=f"按下 {cfg['hotkey'].upper()} 開始框選")
 
 
 def main():
