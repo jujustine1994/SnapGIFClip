@@ -19,6 +19,8 @@ DEFAULT_FFMPEG = os.path.join(BIN_DIR, "ffmpeg.exe")
 def encode_gif(frames: list, output_path: str, fps: int,
                colors: int, dithering: bool):
     """給定 PIL Image 列表，輸出 GIF 到 output_path。"""
+    if not frames:
+        raise ValueError("frames is empty")
     duration_ms = int(1000 / fps)
     dither_mode = Image.Dither.FLOYDSTEINBERG if dithering else Image.Dither.NONE
     converted = [
