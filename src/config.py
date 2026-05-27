@@ -13,15 +13,15 @@ DEFAULT = {
     "fps": 15,
     "scale": 1.0,
     "countdown": True,
+    "output_format": "both",
     "gif": {"colors": 256, "dithering": True},
     "mp4": {"crf": 23},
 }
 
 
 def load() -> dict:
-    path = os.environ.get("SNAPGIFCLIP_CONFIG") or os.path.join(SCRIPT_DIR, "config.json")
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(CONFIG_PATH, encoding="utf-8") as f:
             raw = json.load(f)
         merged = dict(DEFAULT)
         merged.update(raw)
@@ -33,8 +33,7 @@ def load() -> dict:
 
 
 def save(cfg: dict):
-    path = os.environ.get("SNAPGIFCLIP_CONFIG") or os.path.join(SCRIPT_DIR, "config.json")
-    with open(path, "w", encoding="utf-8") as f:
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
 
 

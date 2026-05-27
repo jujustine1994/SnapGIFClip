@@ -1,5 +1,4 @@
 mss
 Pillow
-imageio
 pynput
 sv-ttk

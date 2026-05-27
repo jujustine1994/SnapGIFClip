@@ -16,20 +16,13 @@ _bin_ffmpeg = os.path.join(BIN_DIR, "ffmpeg.exe")
 DEFAULT_FFMPEG = _bin_ffmpeg if os.path.exists(_bin_ffmpeg) else (shutil.which("ffmpeg") or _bin_ffmpeg)
 
 
-# ---- 純計算函式 ----
-
 def calc_output_duration(start: float, end: float, speed: float) -> float:
-    """選取時長除以速度 = 實際輸出時長（秒）。速度 2x → 時長減半。"""
     return (end - start) / speed
 
 
 def estimate_gif_size(width: int, height: int, fps: int,
                       duration_secs: float, colors: int) -> float:
-    """
-    GIF 容量粗估（MB）。
-    公式：每 frame 平均像素數 × log2(colors)/8 × 壓縮率 × frame 數。
-    壓縮率約 0.15（螢幕錄製多為重複區塊）。
-    """
+    """GIF 容量粗估（MB）。壓縮率 0.15 適用螢幕錄製（重複色塊多）。"""
     pixels_per_frame = width * height
     bits_per_pixel = math.log2(max(colors, 2))
     bytes_per_frame = pixels_per_frame * bits_per_pixel / 8 * 0.15
@@ -39,22 +32,15 @@ def estimate_gif_size(width: int, height: int, fps: int,
 
 def estimate_mp4_size(width: int, height: int, fps: int,
                       duration_secs: float, crf: int) -> float:
-    """
-    MP4 容量粗估（MB）。
-    依 CRF 推算目標 bitrate（kbps），再乘時長。
-    基準：1080p CRF23 ≈ 2000 kbps，按解析度比例縮放。
-    """
+    """MP4 容量粗估（MB）。基準：1080p CRF23 ≈ 2000 kbps，按解析度比例縮放。"""
     base_pixels = 1920 * 1080
     actual_pixels = width * height
     base_bitrate_kbps = 2000 * (actual_pixels / base_pixels)
-    # CRF 每增加 6，bitrate 約減半
-    crf_factor = 2 ** ((23 - crf) / 6)
+    crf_factor = 2 ** ((23 - crf) / 6)  # CRF 每增加 6，bitrate 約減半
     bitrate_kbps = base_bitrate_kbps * crf_factor
     size_kb = bitrate_kbps * duration_secs / 8
     return size_kb / 1024
 
-
-# ---- EditorTab UI ----
 
 class EditorTab:
     """影像編輯 Tab 的完整 UI 與邏輯。"""
@@ -77,20 +63,15 @@ class EditorTab:
         tab = self._parent
         _font = ("Microsoft JhengHei", 13)
 
-        # 左右分割容器
         container = ttk.Frame(tab)
         container.pack(fill="both", expand=True)
 
-        # 左側：載入 + 預覽（可伸縮）
         left = ttk.Frame(container)
         left.pack(side="left", fill="both", expand=True, padx=(0, 6))
 
-        # 右側：控制區（固定寬）
         right = ttk.Frame(container, width=380)
         right.pack(side="right", fill="y")
         right.pack_propagate(False)
-
-        # ===== 左側 =====
 
         f_load = ttk.LabelFrame(left, text=" 載入檔案 ", padding=8)
         f_load.pack(fill="x", pady=(0, 6))
@@ -116,8 +97,6 @@ class EditorTab:
         self._btn_play.pack(side="left")
         self._play_label = ttk.Label(ctrl_row, text="", style="Hint.TLabel")
         self._play_label.pack(side="left", padx=8)
-
-        # ===== 右側 =====
 
         f_trim = ttk.LabelFrame(right, text=" 裁切範圍 ", padding=8)
         f_trim.pack(fill="x", pady=(0, 8), padx=4)
@@ -182,8 +161,6 @@ class EditorTab:
         self._result_path = ""
 
         self._debounce_job = None
-
-    # ---- 檔案載入 ----
 
     def _open_file(self):
         path = filedialog.askopenfilename(
@@ -252,6 +229,7 @@ class EditorTab:
         self._info_label.config(
             text=f"{os.path.splitext(self._src_path)[1].upper().lstrip('.')}｜"
                  f"{w}×{h}｜{total:.1f} 秒｜{self._fps} fps",
+            foreground="",
         )
         self._start_scale.config(to=total)
         self._end_scale.config(to=total)
@@ -261,8 +239,6 @@ class EditorTab:
         self._btn_play.config(state="normal")
         self._btn_export.config(state="normal")
         self._on_trim_change()
-
-    # ---- 預覽 ----
 
     def _show_frame(self, idx: int):
         if not self._frames or idx >= len(self._frames):
@@ -304,8 +280,6 @@ class EditorTab:
     def _get_end_frame_idx(self) -> int:
         return min(len(self._frames) - 1, int(self._end_var.get() * self._fps))
 
-    # ---- 裁切/速度變更 ----
-
     def _on_trim_change(self, _=None):
         start = self._start_var.get()
         end = self._end_var.get()
@@ -342,8 +316,6 @@ class EditorTab:
         else:
             mb = estimate_mp4_size(w, h, self._fps, out_dur, cfg["mp4"]["crf"])
         self._size_label.config(text=f"預估容量：約 {mb:.1f} MB（估算值）")
-
-    # ---- 匯出 ----
 
     def _export(self):
         if not self._frames:

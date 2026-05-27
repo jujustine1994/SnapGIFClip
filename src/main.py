@@ -3,11 +3,9 @@ import ctypes
 import os
 import queue
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog
 
 import src.config as config
-
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 try:
     ctypes.windll.shcore.SetProcessDpiAwareness(1)
@@ -63,8 +61,6 @@ class SnapGIFClipApp:
         self._start_hotkey_listener(self._cfg["hotkey"])
         self._poll_queue()
 
-    # ---- 樣式 ----
-
     def _apply_styles(self):
         from tkinter import font as tkfont
         for name in ("TkDefaultFont", "TkTextFont", "TkMenuFont"):
@@ -87,14 +83,12 @@ class SnapGIFClipApp:
         style.configure("TNotebook.Tab",      font=font_main)
         style.configure("Hint.TLabel",        font=font_hint, foreground="#888888")
 
-    # ---- UI ----
-
     def _build_ui(self):
         self._notebook = ttk.Notebook(self.root)
         self._notebook.pack(fill="both", expand=True, padx=12, pady=(8, 0))
 
-        self._tab_main = ttk.Frame(self._notebook, padding=10)
-        self._tab_editor = ttk.Frame(self._notebook, padding=10)
+        self._tab_main     = ttk.Frame(self._notebook, padding=10)
+        self._tab_editor   = ttk.Frame(self._notebook, padding=10)
         self._tab_settings = ttk.Frame(self._notebook, padding=10)
 
         self._notebook.add(self._tab_main,     text="  主要工作  ")
@@ -105,25 +99,87 @@ class SnapGIFClipApp:
         self._build_settings_tab()
         self._build_editor_tab()
 
-    # ================================================================
-    # 設定 Tab
-    # ================================================================
-
-    def _build_settings_tab(self):
-        tab = self._tab_settings
-
-        # 輸出資料夾
-        f_folder = ttk.LabelFrame(tab, text=" 輸出資料夾 ", padding=8)
-        f_folder.pack(fill="x", pady=(0, 10))
-        f_folder.columnconfigure(0, weight=1)
+    def _build_main_tab(self):
+        tab = self._tab_main
         _font = ("Microsoft JhengHei", 13)
+
+        f_status = ttk.LabelFrame(tab, text=" 狀態 ", padding=8)
+        f_status.pack(fill="x", pady=(0, 8))
+        self._status_label = ttk.Label(f_status, text="● 就緒", foreground="#27ae60")
+        self._status_label.pack(anchor="w")
+        self._hotkey_hint = ttk.Label(
+            f_status,
+            text=f"按下 {self._cfg['hotkey'].upper()} 開始框選",
+            style="Hint.TLabel",
+        )
+        self._hotkey_hint.pack(anchor="w")
+
+        f_fmt = ttk.LabelFrame(tab, text=" 輸出格式 ", padding=8)
+        f_fmt.pack(fill="x", pady=(0, 8))
+        self._format_var = tk.StringVar(value=self._cfg.get("output_format", "both"))
+        for text, val in (("GIF", "gif"), ("MP4", "mp4"), ("GIF + MP4", "both")):
+            ttk.Radiobutton(f_fmt, text=text, variable=self._format_var,
+                            value=val, command=self._save_settings).pack(side="left", padx=8)
+
+        f_folder = ttk.LabelFrame(tab, text=" 輸出資料夾 ", padding=8)
+        f_folder.pack(fill="x", pady=(0, 8))
+        f_folder.columnconfigure(0, weight=1)
         self._folder_var = tk.StringVar(value=self._cfg["output_folder"])
         ttk.Entry(f_folder, textvariable=self._folder_var,
-                  state="readonly", width=38, font=_font).grid(row=0, column=0, sticky="ew", padx=(0, 8))
+                  state="readonly", font=_font).grid(row=0, column=0, sticky="ew", padx=(0, 8))
         ttk.Button(f_folder, text="變更", width=6,
                    command=self._change_folder).grid(row=0, column=1)
 
-        # 快捷鍵
+        f_mode = ttk.LabelFrame(tab, text=" 錄製模式 ", padding=8)
+        f_mode.pack(fill="x", pady=(0, 8))
+        self._mode_var = tk.StringVar(value=self._cfg.get("record_mode", "fixed"))
+        self._duration_var = tk.IntVar(value=self._cfg["default_duration"])
+
+        row_fixed = ttk.Frame(f_mode)
+        row_fixed.pack(fill="x", pady=(0, 4))
+        ttk.Radiobutton(row_fixed, text="固定秒數：", variable=self._mode_var,
+                        value="fixed", command=self._on_mode_change).pack(side="left")
+        self._duration_spinbox = ttk.Spinbox(
+            row_fixed, from_=1, to=300, width=6,
+            textvariable=self._duration_var, font=_font)
+        self._duration_spinbox.pack(side="left")
+        ttk.Label(row_fixed, text=" 秒").pack(side="left")
+
+        ttk.Radiobutton(f_mode, text="手動停止（再按快捷鍵停止）",
+                        variable=self._mode_var,
+                        value="manual", command=self._on_mode_change).pack(anchor="w")
+
+        self._on_mode_change()
+        self._duration_var.trace_add("write", lambda *_: self._save_settings())
+
+        self._f_progress = ttk.LabelFrame(tab, text=" 錄製進度 ", padding=8)
+        self._progress_bar = ttk.Progressbar(
+            self._f_progress, mode="determinate", length=280)
+        self._progress_bar.pack(fill="x")
+        self._progress_label = ttk.Label(self._f_progress, text="0.0 / 0 秒")
+        self._progress_label.pack(anchor="w", pady=(4, 0))
+        btn_row = ttk.Frame(self._f_progress)
+        btn_row.pack(pady=(6, 0))
+        self._btn_stop = ttk.Button(
+            btn_row, text="⏹  提早停止", command=self._stop_recording)
+        self._btn_stop.pack(side="left", padx=(0, 8), ipady=4)
+        self._btn_discard = ttk.Button(
+            btn_row, text="🗑  廢棄", command=self._discard_recording)
+        self._btn_discard.pack(side="left", ipady=4)
+
+        self._f_output = ttk.LabelFrame(tab, text=" 最後輸出 ", padding=8)
+        self._output_labels: list = []
+        self._btn_open_folder = ttk.Button(
+            self._f_output, text="📂  開啟資料夾",
+            command=self._open_output_folder)
+        self._btn_open_folder.pack(pady=(4, 0))
+
+        self._last_output_folder = ""
+
+    def _build_settings_tab(self):
+        tab = self._tab_settings
+        _font = ("Microsoft JhengHei", 13)
+
         f_hotkey = ttk.LabelFrame(tab, text=" 快捷鍵 ", padding=8)
         f_hotkey.pack(fill="x", pady=(0, 10))
         self._hotkey_var = tk.StringVar(value=self._cfg["hotkey"])
@@ -135,7 +191,6 @@ class SnapGIFClipApp:
                                         style="Hint.TLabel")
         self._hk_hint_label.pack(side="left")
 
-        # 錄製設定
         f_rec = ttk.LabelFrame(tab, text=" 錄製設定 ", padding=8)
         f_rec.pack(fill="x", pady=(0, 10))
 
@@ -165,11 +220,9 @@ class SnapGIFClipApp:
                         variable=self._countdown_var,
                         command=self._save_settings).pack(side="left")
 
-        # 進階影像設定
         ttk.Button(tab, text="⚙  進階影像設定",
                    command=self._open_advanced).pack(pady=(6, 0))
 
-        # 自動儲存 traces
         for var in (self._fps_var, self._scale_var):
             var.trace_add("write", lambda *_: self._save_settings())
 
@@ -189,6 +242,7 @@ class SnapGIFClipApp:
             cfg["fps"]              = int(self._fps_var.get())
             cfg["scale"]            = float(self._scale_var.get())
             cfg["countdown"]        = bool(self._countdown_var.get())
+            cfg["output_format"]    = self._format_var.get()
             config.save(cfg)
             self._cfg = cfg
             self._hotkey_hint.config(
@@ -205,7 +259,6 @@ class SnapGIFClipApp:
 
         pad = {"padx": 14, "pady": 6}
 
-        # GIF
         f_gif = ttk.LabelFrame(win, text=" GIF ", padding=8)
         f_gif.pack(fill="x", **pad)
         colors_var = tk.IntVar(value=cfg["gif"]["colors"])
@@ -218,7 +271,6 @@ class SnapGIFClipApp:
         ttk.Checkbutton(f_gif, text="Dithering（建議開啟，提升漸層品質）",
                         variable=dither_var).pack(anchor="w")
 
-        # MP4
         f_mp4 = ttk.LabelFrame(win, text=" MP4 ", padding=8)
         f_mp4.pack(fill="x", **pad)
         crf_presets = {"低（檔案大）": 18, "中（預設）": 23, "高（檔案小）": 28}
@@ -247,8 +299,6 @@ class SnapGIFClipApp:
             side="left", padx=4, ipady=4)
         ttk.Button(btn_row, text="取消", command=win.destroy, width=10).pack(
             side="left", padx=4, ipady=4)
-
-    # ---- 快捷鍵設定捕捉 ----
 
     def _start_hotkey_capture(self, _event=None):
         self._hk_entry.config(state="normal")
@@ -290,8 +340,6 @@ class SnapGIFClipApp:
         self._save_settings()
         return "break"
 
-    # ---- pynput 監聽 ----
-
     def _start_hotkey_listener(self, hotkey_str: str):
         if self._listener:
             try:
@@ -314,95 +362,16 @@ class SnapGIFClipApp:
         except Exception as e:
             print(f"[WARN] 快捷鍵監聽啟動失敗：{e}")
 
-    # ================================================================
-    # 主要工作 Tab（佔位，Task 7 填入）
-    # ================================================================
-
-    def _build_main_tab(self):
-        tab = self._tab_main
-
-        # 狀態
-        f_status = ttk.LabelFrame(tab, text=" 狀態 ", padding=8)
-        f_status.pack(fill="x", pady=(0, 8))
-        self._status_label = ttk.Label(f_status, text="● 就緒", foreground="#27ae60")
-        self._status_label.pack(anchor="w")
-        self._hotkey_hint = ttk.Label(
-            f_status,
-            text=f"按下 {self._cfg['hotkey'].upper()} 開始框選",
-            style="Hint.TLabel",
-        )
-        self._hotkey_hint.pack(anchor="w")
-
-        # 輸出格式
-        f_fmt = ttk.LabelFrame(tab, text=" 輸出格式 ", padding=8)
-        f_fmt.pack(fill="x", pady=(0, 8))
-        self._format_var = tk.StringVar(value="both")
-        for text, val in (("GIF", "gif"), ("MP4", "mp4"), ("GIF + MP4", "both")):
-            ttk.Radiobutton(f_fmt, text=text, variable=self._format_var,
-                            value=val).pack(side="left", padx=8)
-
-        # 錄製模式
-        f_mode = ttk.LabelFrame(tab, text=" 錄製模式 ", padding=8)
-        f_mode.pack(fill="x", pady=(0, 8))
-        self._mode_var = tk.StringVar(value=self._cfg.get("record_mode", "fixed"))
-        _font = ("Microsoft JhengHei", 13)
-        self._duration_var = tk.IntVar(value=self._cfg["default_duration"])
-
-        row_fixed = ttk.Frame(f_mode)
-        row_fixed.pack(fill="x", pady=(0, 4))
-        ttk.Radiobutton(row_fixed, text="固定秒數：", variable=self._mode_var,
-                        value="fixed", command=self._on_mode_change).pack(side="left")
-        self._duration_spinbox = ttk.Spinbox(
-            row_fixed, from_=1, to=300, width=6,
-            textvariable=self._duration_var, font=_font)
-        self._duration_spinbox.pack(side="left")
-        ttk.Label(row_fixed, text=" 秒").pack(side="left")
-
-        ttk.Radiobutton(f_mode, text="手動停止（再按快捷鍵停止）",
-                        variable=self._mode_var,
-                        value="manual", command=self._on_mode_change).pack(anchor="w")
-
-        self._on_mode_change()  # 初始化 spinbox 狀態
-        self._duration_var.trace_add("write", lambda *_: self._save_settings())
-
-        # 錄製進度（隱藏）
-        self._f_progress = ttk.LabelFrame(tab, text=" 錄製進度 ", padding=8)
-        self._progress_bar = ttk.Progressbar(
-            self._f_progress, mode="determinate", length=280)
-        self._progress_bar.pack(fill="x")
-        self._progress_label = ttk.Label(self._f_progress, text="0.0 / 0 秒")
-        self._progress_label.pack(anchor="w", pady=(4, 0))
-        btn_row = ttk.Frame(self._f_progress)
-        btn_row.pack(pady=(6, 0))
-        self._btn_stop = ttk.Button(
-            btn_row, text="⏹  提早停止", command=self._stop_recording)
-        self._btn_stop.pack(side="left", padx=(0, 8), ipady=4)
-        self._btn_discard = ttk.Button(
-            btn_row, text="🗑  廢棄", command=self._discard_recording)
-        self._btn_discard.pack(side="left", ipady=4)
-
-        # 最後輸出（隱藏）
-        self._f_output = ttk.LabelFrame(tab, text=" 最後輸出 ", padding=8)
-        self._output_labels: list = []
-        self._btn_open_folder = ttk.Button(
-            self._f_output, text="📂  開啟資料夾",
-            command=self._open_output_folder)
-        self._btn_open_folder.pack(pady=(4, 0))
-
-        self._last_output_folder = ""
-
     def _build_editor_tab(self):
         try:
             from src.editor import EditorTab
             EditorTab(self._tab_editor, self._cfg)
         except (ImportError, AttributeError):
-            ttk.Label(self._tab_editor, text="影像編輯 Tab（Task 8 實作）").pack()
-
-    # ---- 觸發錄製 ----
+            ttk.Label(self._tab_editor, text="影像編輯模組載入失敗").pack()
 
     def _trigger_recording(self):
         if self._recorder is not None:
-            return  # 已在錄製中
+            return
         cfg = config.load()
         from src.overlay import FullscreenOverlay
         FullscreenOverlay(
@@ -420,7 +389,6 @@ class SnapGIFClipApp:
         from src.overlay import RecordingBorder
         self._border = RecordingBorder(self.root, x1, y1, x2, y2)
 
-        # 顯示進度區
         self._f_progress.pack(fill="x", pady=(0, 8))
         self._f_output.pack_forget()
         if mode == "fixed":
@@ -461,10 +429,18 @@ class SnapGIFClipApp:
     def _stop_recording(self):
         if self._recorder:
             self._recorder.stop()
+        if self._border:
+            self._border.destroy()
+            self._border = None
+        self._progress_label.config(text="編碼中，請稍候...")
 
     def _discard_recording(self):
         if self._recorder:
             self._recorder.discard()
+        if self._border:
+            self._border.destroy()
+            self._border = None
+        self._progress_label.config(text="廢棄中...")
 
     def _start_hotkey_listener_stop_mode(self):
         if self._listener:
@@ -487,11 +463,30 @@ class SnapGIFClipApp:
         except Exception:
             pass
 
+    def _notify(self, title: str, message: str):
+        try:
+            import subprocess
+            t = title.replace("'", "''")
+            m = message.replace("'", "''")
+            ps_cmd = (
+                "Add-Type -AssemblyName System.Windows.Forms;"
+                "$n = New-Object System.Windows.Forms.NotifyIcon;"
+                "$n.Icon = [System.Drawing.SystemIcons]::Information;"
+                "$n.Visible = $true;"
+                f"$n.ShowBalloonTip(5000, '{t}', '{m}', [System.Windows.Forms.ToolTipIcon]::None);"
+                "Start-Sleep -Milliseconds 6000;"
+                "$n.Visible = $false; $n.Dispose();"
+            )
+            subprocess.Popen(
+                ["powershell", "-WindowStyle", "Hidden", "-NonInteractive", "-Command", ps_cmd],
+                creationflags=0x08000000,
+            )
+        except Exception:
+            pass
+
     def _open_output_folder(self):
         if self._last_output_folder and os.path.exists(self._last_output_folder):
             os.startfile(self._last_output_folder)
-
-    # ---- Queue poll ----
 
     def _poll_queue(self):
         try:
@@ -524,13 +519,16 @@ class SnapGIFClipApp:
 
             if error:
                 self._status_label.config(text=f"❌ 錯誤：{error}", foreground="#e74c3c")
+                self._notify("SnapGIFClip 錄製失敗", error[:80])
                 return
 
-            # 廢棄：paths 為空且無 error，靜默重置
             if not paths:
                 self._status_label.config(text="● 就緒", foreground="#27ae60")
                 self._hotkey_hint.config(text=f"按下 {cfg['hotkey'].upper()} 開始框選")
                 return
+
+            filenames = "、".join(os.path.basename(p) for p in paths)
+            self._notify("SnapGIFClip 錄製完成", f"已儲存：{filenames}")
 
             for lbl in self._output_labels:
                 lbl.destroy()

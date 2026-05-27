@@ -113,49 +113,53 @@ class Recorder:
         self._stop_event.set()
 
     def _run(self):
-        import mss
-        frames = []
-        interval = 1.0 / self.fps
-        start_time = time.time()
-
-        with mss.mss() as sct:
-            while not self._stop_event.is_set():
-                elapsed = time.time() - start_time
-                if self.duration > 0 and elapsed >= self.duration:
-                    break
-                frame_start = time.time()
-                raw = sct.grab(self.region)
-                img = Image.frombytes("RGB", raw.size, raw.bgra, "raw", "BGRX")
-                if self.scale != 1.0:
-                    nw = max(2, int(img.width * self.scale))
-                    nh = max(2, int(img.height * self.scale))
-                    img = img.resize((nw, nh), Image.LANCZOS)
-                frames.append(img)
-                if self.on_progress:
-                    self.on_progress(elapsed)
-                sleep = interval - (time.time() - frame_start)
-                if sleep > 0:
-                    time.sleep(sleep)
-
-        if self._discard:
-            if self.on_done:
-                self.on_done([], None)
-            return
-
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        paths, error = [], None
         try:
-            os.makedirs(self.output_folder, exist_ok=True)
-            if self.output_format in ("gif", "both"):
-                p = os.path.join(self.output_folder, f"snap_{timestamp}.gif")
-                encode_gif(frames, p, self.fps, self.gif_colors, self.gif_dither)
-                paths.append(p)
-            if self.output_format in ("mp4", "both"):
-                p = os.path.join(self.output_folder, f"snap_{timestamp}.mp4")
-                encode_mp4(frames, p, self.fps, self.mp4_crf, self.ffmpeg_path)
-                paths.append(p)
-        except Exception as e:
-            error = str(e)
+            import mss
+            frames = []
+            interval = 1.0 / self.fps
+            start_time = time.time()
 
-        if self.on_done:
-            self.on_done(paths, error)
+            with mss.mss() as sct:
+                while not self._stop_event.is_set():
+                    elapsed = time.time() - start_time
+                    if self.duration > 0 and elapsed >= self.duration:
+                        break
+                    frame_start = time.time()
+                    raw = sct.grab(self.region)
+                    img = Image.frombytes("RGB", raw.size, raw.bgra, "raw", "BGRX")
+                    if self.scale != 1.0:
+                        nw = max(2, int(img.width * self.scale))
+                        nh = max(2, int(img.height * self.scale))
+                        img = img.resize((nw, nh), Image.LANCZOS)
+                    frames.append(img)
+                    if self.on_progress:
+                        self.on_progress(elapsed)
+                    sleep = interval - (time.time() - frame_start)
+                    if sleep > 0:
+                        time.sleep(sleep)
+
+            if self._discard:
+                if self.on_done:
+                    self.on_done([], None)
+                return
+
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            paths, error = [], None
+            try:
+                os.makedirs(self.output_folder, exist_ok=True)
+                if self.output_format in ("gif", "both"):
+                    p = os.path.join(self.output_folder, f"snap_{timestamp}.gif")
+                    encode_gif(frames, p, self.fps, self.gif_colors, self.gif_dither)
+                    paths.append(p)
+                if self.output_format in ("mp4", "both"):
+                    p = os.path.join(self.output_folder, f"snap_{timestamp}.mp4")
+                    encode_mp4(frames, p, self.fps, self.mp4_crf, self.ffmpeg_path)
+                    paths.append(p)
+            except Exception as e:
+                error = str(e)
+
+            if self.on_done:
+                self.on_done(paths, error)
+        except Exception as e:
+            if self.on_done:
+                self.on_done([], str(e))
