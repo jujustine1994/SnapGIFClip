@@ -95,10 +95,14 @@ class TimelineCanvas:
 
     @staticmethod
     def time_to_x(t: float, total: float, width: int) -> int:
+        if total <= 0 or width <= 0:
+            return 0
         return int(t / total * width)
 
     @staticmethod
     def x_to_time(x: int, total: float, width: int) -> float:
+        if total <= 0 or width <= 0:
+            return 0.0
         return max(0.0, min(total, x / width * total))
 
     @staticmethod
@@ -525,8 +529,9 @@ class EditorTab:
         start = self._start_var.get()
         end = self._end_var.get()
         if start >= end and self._frames:
-            end = min(start + 0.1, self._total_secs)
-            self._end_var.set(end)
+            new_end = min(start + 0.1, self._total_secs)
+            if new_end != self._end_var.get():
+                self._end_var.set(new_end)
             return  # trace 會再次觸發，屆時 start < end
         focused = self._parent.focus_get()
         if focused is not self._start_entry:
