@@ -121,16 +121,61 @@ class TimelineCanvas:
         self._redraw()
 
     def _generate_thumbnails(self) -> None:
-        pass  # Task 2 實作
+        frames = self._source_frames
+        if not frames:
+            self._thumbnails = []
+            return
+        w = max(self._canvas.winfo_width(), 400)   # 400 為 widget 尚未顯示時的回退值
+        n = max(1, w // self.THUMB_W)
+        step = max(1, len(frames) // n)
+        sampled = frames[::step][:n]
+        thumb_w = w // len(sampled)
+        self._thumbnails = []
+        for frame in sampled:
+            img = frame.copy()
+            img.thumbnail((thumb_w, self.TRACK_H), Image.LANCZOS)
+            self._thumbnails.append(ImageTk.PhotoImage(img))
+
+    def _draw_filmstrip(self) -> None:
+        if not self._thumbnails:
+            return
+        w = self._w()
+        thumb_w = w // len(self._thumbnails)
+        for i, photo in enumerate(self._thumbnails):
+            self._canvas.create_image(i * thumb_w, 0, anchor="nw", image=photo)
+
+    def _draw_tick_marks(self) -> None:
+        w = self._w()
+        y0 = self.TRACK_H
+        intervals = [0.5, 1, 2, 5, 10, 30, 60]
+        target_n = max(2, w // 60)
+        interval = next(
+            (iv for iv in intervals if self._total / iv <= target_n * 2),
+            intervals[-1],
+        )
+        t = 0.0
+        while t <= self._total + 0.001:
+            x = self.time_to_x(t, self._total, w)
+            self._canvas.create_line(x, y0, x, y0 + 5, fill="#888888")
+            label = f"{t:.0f}s" if t == int(t) else f"{t:.1f}s"
+            self._canvas.create_text(
+                x, y0 + 7, text=label,
+                fill="#888888", font=("Microsoft JhengHei", 7), anchor="n",
+            )
+            t = round(t + interval, 3)
 
     def _redraw(self) -> None:
         self._canvas.delete("all")
+        self._draw_filmstrip()
+        self._draw_tick_marks()
+        self._draw_overlay()
 
     def _draw_overlay(self) -> None:
         pass  # Task 3 實作
 
     def _on_resize(self, _event) -> None:
-        pass  # Task 2 實作
+        if self._source_frames:
+            self._regen_and_redraw()
 
     def _on_press(self, event) -> None:
         pass  # Task 4 實作
