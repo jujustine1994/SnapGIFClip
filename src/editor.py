@@ -309,23 +309,34 @@ class EditorTab:
         self._start_var = tk.DoubleVar(value=0.0)
         self._end_var = tk.DoubleVar(value=0.0)
 
-        r0 = ttk.Frame(f_trim); r0.pack(fill="x", pady=2)
-        ttk.Label(r0, text="起始：", width=5).pack(side="left")
-        self._start_scale = ttk.Scale(r0, variable=self._start_var,
-                                      from_=0, to=1, orient="horizontal",
-                                      command=self._on_trim_change)
-        self._start_scale.pack(side="left", fill="x", expand=True)
-        self._start_label = ttk.Label(r0, text="0.0 秒", width=7)
-        self._start_label.pack(side="left")
+        self._start_str = tk.StringVar(value="0.0")
+        self._end_str = tk.StringVar(value="0.0")
 
-        r1 = ttk.Frame(f_trim); r1.pack(fill="x", pady=2)
-        ttk.Label(r1, text="結束：", width=5).pack(side="left")
-        self._end_scale = ttk.Scale(r1, variable=self._end_var,
-                                    from_=0, to=1, orient="horizontal",
-                                    command=self._on_trim_change)
-        self._end_scale.pack(side="left", fill="x", expand=True)
-        self._end_label = ttk.Label(r1, text="0.0 秒", width=7)
-        self._end_label.pack(side="left")
+        for lbl_text, str_var, dbl_var, is_start in (
+            ("起始：", self._start_str, self._start_var, True),
+            ("結束：", self._end_str, self._end_var, False),
+        ):
+            row = ttk.Frame(f_trim)
+            row.pack(fill="x", pady=2)
+            ttk.Label(row, text=lbl_text, width=5).pack(side="left")
+            ttk.Button(row, text="◀", width=2,
+                       command=lambda dv=dbl_var: self._step_time(dv, -0.1)
+                       ).pack(side="left")
+            entry = ttk.Entry(row, textvariable=str_var, width=6,
+                              font=_font, justify="right")
+            entry.pack(side="left", padx=2)
+            ttk.Label(row, text="秒").pack(side="left")
+            ttk.Button(row, text="▶", width=2,
+                       command=lambda dv=dbl_var: self._step_time(dv, 0.1)
+                       ).pack(side="left")
+            entry.bind("<Return>",
+                       lambda e, dv=dbl_var, sv=str_var: self._commit_entry(dv, sv, e.widget))
+            entry.bind("<FocusOut>",
+                       lambda e, dv=dbl_var, sv=str_var: self._commit_entry(dv, sv, e.widget))
+            if is_start:
+                self._start_entry = entry
+            else:
+                self._end_entry = entry
 
         self._trim_info = ttk.Label(f_trim, text="", foreground="#2980b9")
         self._trim_info.pack(anchor="w")
@@ -367,6 +378,21 @@ class EditorTab:
         self._result_path = ""
 
         self._debounce_job = None
+
+    def _step_time(self, dbl_var: tk.DoubleVar, delta: float) -> None:
+        val = round(dbl_var.get() + delta, 1)
+        val = max(0.0, min(self._total_secs, val))
+        dbl_var.set(val)
+
+    def _commit_entry(self, dbl_var: tk.DoubleVar, str_var: tk.StringVar, widget) -> None:
+        try:
+            val = float(str_var.get())
+            val = max(0.0, min(self._total_secs, round(val, 2)))
+            dbl_var.set(val)
+        except ValueError:
+            widget.configure(foreground="red")
+            widget.after(500, lambda: widget.configure(foreground=""))
+            str_var.set(f"{dbl_var.get():.1f}")
 
     def _open_file(self):
         path = filedialog.askopenfilename(
@@ -437,8 +463,6 @@ class EditorTab:
                  f"{w}×{h}｜{total:.1f} 秒｜{self._fps} fps",
             foreground="",
         )
-        self._start_scale.config(to=total)
-        self._end_scale.config(to=total)
         self._start_var.set(0.0)
         self._end_var.set(total)
         self._show_frame(0)
@@ -492,8 +516,8 @@ class EditorTab:
         if start >= end and self._frames:
             end = min(start + 0.1, self._total_secs)
             self._end_var.set(end)
-        self._start_label.config(text=f"{start:.1f} 秒")
-        self._end_label.config(text=f"{end:.1f} 秒")
+        self._start_str.set(f"{start:.1f}")
+        self._end_str.set(f"{end:.1f}")
         sel_dur = max(0, end - start)
         speed = self._speed_var.get()
         out_dur = calc_output_duration(start, end, speed)
