@@ -171,7 +171,33 @@ class TimelineCanvas:
         self._draw_overlay()
 
     def _draw_overlay(self) -> None:
-        pass  # Task 3 實作
+        self._canvas.delete("overlay")
+        w = self._w()
+        h = self.TRACK_H
+        sx = self.time_to_x(self._start, self._total, w)
+        ex = self.time_to_x(self._end, self._total, w)
+
+        # 非選取區暗化
+        if sx > 0:
+            self._canvas.create_rectangle(
+                0, 0, sx, h,
+                fill="#000000", stipple="gray50", tags="overlay")
+        if ex < w:
+            self._canvas.create_rectangle(
+                ex, 0, w, h,
+                fill="#000000", stipple="gray50", tags="overlay")
+        # 選取區藍色半透明高亮
+        self._canvas.create_rectangle(
+            sx, 0, ex, h,
+            fill="#3498db", stipple="gray25", outline="", tags="overlay")
+        # 左把手
+        self._canvas.create_rectangle(
+            sx - self.HANDLE_W, 0, sx + self.HANDLE_W, h,
+            fill="#2980b9", outline="", tags="overlay")
+        # 右把手
+        self._canvas.create_rectangle(
+            ex - self.HANDLE_W, 0, ex + self.HANDLE_W, h,
+            fill="#2980b9", outline="", tags="overlay")
 
     def _on_resize(self, _event) -> None:
         if self._source_frames:
