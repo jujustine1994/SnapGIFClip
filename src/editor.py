@@ -42,6 +42,108 @@ def estimate_mp4_size(width: int, height: int, fps: int,
     return size_kb / 1024
 
 
+class TimelineCanvas:
+    """影像編輯頁時間軸：Filmstrip 縮圖 + 拖拉選取框。"""
+
+    HANDLE_W = 8     # 把手半寬（px）
+    TRACK_H = 55     # 縮圖軌道高度（px）
+    TICK_H = 15      # 時間刻度區高度（px）
+    THUMB_W = 60     # 目標縮圖寬度（px）
+
+    def __init__(self, parent: tk.Widget, on_range_change):
+        self._on_range_change = on_range_change
+        self._total: float = 1.0
+        self._start: float = 0.0
+        self._end: float = 1.0
+        self._thumbnails: list = []
+        self._source_frames: list = []
+        self._drag_mode = None
+        self._drag_x0: int = 0
+        self._drag_s0: float = 0.0
+        self._drag_e0: float = 0.0
+
+        self._canvas = tk.Canvas(
+            parent,
+            height=self.TRACK_H + self.TICK_H,
+            bg="#2a2a2a",
+            highlightthickness=0,
+        )
+        self._canvas.pack(fill="x", pady=(0, 4))
+        self._canvas.bind("<Configure>", self._on_resize)
+        self._canvas.bind("<ButtonPress-1>", self._on_press)
+        self._canvas.bind("<B1-Motion>", self._on_drag)
+        self._canvas.bind("<ButtonRelease-1>", self._on_release)
+        self._canvas.bind("<Motion>", self._on_hover)
+
+    # ── 公開 API ──────────────────────────────────────────────
+
+    def load(self, frames: list, fps: int, total_secs: float) -> None:
+        self._source_frames = frames
+        self._fps = fps
+        self._total = max(total_secs, 0.01)
+        self._start = 0.0
+        self._end = self._total
+        self._regen_and_redraw()
+
+    def set_range(self, start: float, end: float) -> None:
+        self._start = start
+        self._end = end
+        self._draw_overlay()
+
+    # ── 純靜態 helpers（可在無 tkinter 環境下測試）──────────
+
+    @staticmethod
+    def time_to_x(t: float, total: float, width: int) -> int:
+        return int(t / total * width)
+
+    @staticmethod
+    def x_to_time(x: int, total: float, width: int) -> float:
+        return max(0.0, min(total, x / width * total))
+
+    @staticmethod
+    def get_drag_mode(x: int, sx: int, ex: int, handle_w: int):
+        if abs(x - sx) <= handle_w:
+            return "left"
+        if abs(x - ex) <= handle_w:
+            return "right"
+        if sx + handle_w < x < ex - handle_w:
+            return "middle"
+        return None
+
+    # ── 私有 helper ───────────────────────────────────────────
+
+    def _w(self) -> int:
+        return max(self._canvas.winfo_width(), 1)
+
+    def _regen_and_redraw(self) -> None:
+        self._generate_thumbnails()
+        self._redraw()
+
+    def _generate_thumbnails(self) -> None:
+        pass  # Task 2 實作
+
+    def _redraw(self) -> None:
+        self._canvas.delete("all")
+
+    def _draw_overlay(self) -> None:
+        pass  # Task 3 實作
+
+    def _on_resize(self, _event) -> None:
+        pass  # Task 2 實作
+
+    def _on_press(self, event) -> None:
+        pass  # Task 4 實作
+
+    def _on_drag(self, event) -> None:
+        pass  # Task 4 實作
+
+    def _on_release(self, _event) -> None:
+        self._drag_mode = None
+
+    def _on_hover(self, event) -> None:
+        pass  # Task 4 實作
+
+
 class EditorTab:
     """影像編輯 Tab 的完整 UI 與邏輯。"""
 
