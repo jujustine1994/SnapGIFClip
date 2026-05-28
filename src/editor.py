@@ -57,6 +57,7 @@ class TimelineCanvas:
         self._end: float = 1.0
         self._thumbnails: list = []
         self._source_frames: list = []
+        self._fps: int = 0
         self._drag_mode = None
         self._drag_x0: int = 0
         self._drag_s0: float = 0.0

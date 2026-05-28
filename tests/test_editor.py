@@ -37,13 +37,12 @@ def test_time_to_x_basic():
     assert TimelineCanvas.time_to_x(t=2.5, total=5.0, width=500) == 250
 
 
-def test_time_to_x_clamp():
+def test_time_to_x_over_boundary():
     # 超出邊界只截斷，不報錯
     assert TimelineCanvas.time_to_x(t=6.0, total=5.0, width=500) == 600  # 超出不 clamp
 
 
 def test_x_to_time_basic():
-    import pytest
     assert TimelineCanvas.x_to_time(x=250, total=5.0, width=500) == pytest.approx(2.5)
 
 
