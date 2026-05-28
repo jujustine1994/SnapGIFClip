@@ -204,16 +204,48 @@ class TimelineCanvas:
             self._regen_and_redraw()
 
     def _on_press(self, event) -> None:
-        pass  # Task 4 實作
+        w = self._w()
+        sx = self.time_to_x(self._start, self._total, w)
+        ex = self.time_to_x(self._end, self._total, w)
+        mode = self.get_drag_mode(event.x, sx, ex, self.HANDLE_W)
+        if mode is None:
+            return
+        self._drag_mode = mode
+        self._drag_x0 = event.x
+        self._drag_s0 = self._start
+        self._drag_e0 = self._end
 
     def _on_drag(self, event) -> None:
-        pass  # Task 4 實作
+        if self._drag_mode is None:
+            return
+        w = self._w()
+        dt = (event.x - self._drag_x0) / w * self._total
+        if self._drag_mode == "left":
+            self._start = max(0.0, min(round(self._drag_s0 + dt, 2), self._drag_e0 - 0.1))
+        elif self._drag_mode == "right":
+            self._end = max(self._drag_s0 + 0.1, min(round(self._drag_e0 + dt, 2), self._total))
+        elif self._drag_mode == "middle":
+            dur = self._drag_e0 - self._drag_s0
+            new_s = max(0.0, min(round(self._drag_s0 + dt, 2), self._total - dur))
+            self._start = new_s
+            self._end = round(new_s + dur, 2)
+        self._draw_overlay()
+        self._on_range_change(self._start, self._end)
 
     def _on_release(self, _event) -> None:
         self._drag_mode = None
 
     def _on_hover(self, event) -> None:
-        pass  # Task 4 實作
+        w = self._w()
+        sx = self.time_to_x(self._start, self._total, w)
+        ex = self.time_to_x(self._end, self._total, w)
+        mode = self.get_drag_mode(event.x, sx, ex, self.HANDLE_W)
+        if mode in ("left", "right"):
+            self._canvas.config(cursor="sb_h_double_arrow")
+        elif mode == "middle":
+            self._canvas.config(cursor="fleur")
+        else:
+            self._canvas.config(cursor="")
 
 
 class EditorTab:
