@@ -295,6 +295,10 @@ class EditorTab:
         self._canvas = tk.Canvas(f_preview, bg="#1a1a1a", highlightthickness=0)
         self._canvas.pack(fill="both", expand=True)
         self._photo = None
+        self._timeline = TimelineCanvas(
+            left,
+            on_range_change=self._on_timeline_change,
+        )
 
         ctrl_row = ttk.Frame(left)
         ctrl_row.pack(fill="x", pady=(0, 4))
@@ -377,7 +381,13 @@ class EditorTab:
                    command=self._open_result_folder).pack(pady=(4, 0))
         self._result_path = ""
 
+        self._start_var.trace_add("write", self._on_trim_change)
+        self._end_var.trace_add("write", self._on_trim_change)
         self._debounce_job = None
+
+    def _on_timeline_change(self, start: float, end: float) -> None:
+        self._start_var.set(round(start, 2))
+        self._end_var.set(round(end, 2))
 
     def _step_time(self, dbl_var: tk.DoubleVar, delta: float) -> None:
         val = round(dbl_var.get() + delta, 1)
@@ -463,6 +473,7 @@ class EditorTab:
                  f"{w}×{h}｜{total:.1f} 秒｜{self._fps} fps",
             foreground="",
         )
+        self._timeline.load(self._frames, self._fps, self._total_secs)
         self._start_var.set(0.0)
         self._end_var.set(total)
         self._show_frame(0)
@@ -510,14 +521,19 @@ class EditorTab:
     def _get_end_frame_idx(self) -> int:
         return min(len(self._frames) - 1, int(self._end_var.get() * self._fps))
 
-    def _on_trim_change(self, _=None):
+    def _on_trim_change(self, *_):
         start = self._start_var.get()
         end = self._end_var.get()
         if start >= end and self._frames:
             end = min(start + 0.1, self._total_secs)
             self._end_var.set(end)
-        self._start_str.set(f"{start:.1f}")
-        self._end_str.set(f"{end:.1f}")
+            return  # trace 會再次觸發，屆時 start < end
+        focused = self._parent.focus_get()
+        if focused is not self._start_entry:
+            self._start_str.set(f"{start:.1f}")
+        if focused is not self._end_entry:
+            self._end_str.set(f"{end:.1f}")
+        self._timeline.set_range(start, end)
         sel_dur = max(0, end - start)
         speed = self._speed_var.get()
         out_dur = calc_output_duration(start, end, speed)
