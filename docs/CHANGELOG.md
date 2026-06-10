@@ -4,6 +4,9 @@
 - 錄製：mss + Pillow + ffmpeg，支援 GIF/MP4
 - 影像編輯：載入 GIF/MP4，裁切/調速後匯出
 
+## 2026-06-10
+- fix: `winget install Python` 加入 `--override "/quiet PrependPath=1 Include_pip=1"`，確保靜默安裝後 Python 自動加進 PATH
+
 ## 2026-05-28
 - refactor: 輸出資料夾從設定頁移至主工作頁（輸出格式與錄製模式之間）
 - fix: _discard_recording() 立即銷毀紅框，與 _stop_recording() 行為一致
