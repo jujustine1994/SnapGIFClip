@@ -6,6 +6,7 @@
 
 ## 2026-06-10
 - fix: `winget install Python` 加入 `--override "/quiet PrependPath=1 Include_pip=1"`，確保靜默安裝後 Python 自動加進 PATH
+- fix: `launcher.ps1` 加入全域 `trap`，攔截未處理例外，防止執行失敗時視窗直接閃退
 
 ## 2026-05-28
 - refactor: 輸出資料夾從設定頁移至主工作頁（輸出格式與錄製模式之間）
